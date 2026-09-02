@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D & CAD Drafting Portfolio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    .viewer-container canvas { width: 100% !important; height: 100% !important; border-radius: 0.5rem; }
+  </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col">
+
+  <header class="border-b border-gray-800 bg-gray-950 px-6 py-4 flex justify-between items-center">
+    <h1 class="text-xl font-bold tracking-tight text-indigo-400">CAD & 3D Modeling Portfolio</h1>
+    <div id="auth-buttons">
+      <button id="login-btn" onclick="openModal('login-modal')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition">관리자 로그인</button>
+      <div id="admin-controls" class="hidden flex gap-2">
+        <button onclick="openModal('upload-modal')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition">+ 새 작품 업로드</button>
+        <button onclick="logout()" class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg text-sm font-medium transition">로그아웃</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto p-6">
+    <div id="portfolio-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div class="bg-gray-800 rounded-xl p-4 border border-gray-700 flex flex-col">
+        <div id="viewer-demo" class="viewer-container h-64 bg-gray-950 rounded-lg mb-4 relative overflow-hidden">
+          <div class="absolute top-2 left-2 bg-gray-900/80 text-xs px-2 py-1 rounded text-gray-400 pointer-events-none">마우스 드래그로 3D 회전</div>
+        </div>
+        <h3 class="text-lg font-bold text-white mb-1">기계 부품 3D 설계 (Sample)</h3>
+        <p class="text-sm text-gray-400 mb-4 flex-1">AutoCAD 및 Inventor를 사용하여 작성한 3D 가공 부품 샘플 데이터입니다.</p>
+        <div class="pt-3 border-t border-gray-700 flex justify-between items-center">
+          <span class="text-xs bg-gray-700 text-indigo-300 px-2.5 py-1 rounded">Inventor</span>
+          <button class="download-btn hidden bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3 py-1.5 rounded transition">CAD/STEP 원본 다운로드</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="login-modal" class="fixed inset-0 bg-black/70 hidden flex items-center justify-center p-4">
+    <div class="bg-gray-800 rounded-xl max-w-md w-full p-6 border border-gray-700">
+      <h2 class="text-xl font-bold mb-4 text-white">관리자 로그인</h2>
+      <form onsubmit="handleLogin(event)">
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-400 mb-1">이메일</label>
+          <input type="email" id="login-email" required class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-indigo-500">
+        </div>
+        <div class="mb-6">
+          <label class="block text-sm font-medium text-gray-400 mb-1">비밀번호</label>
+          <input type="password" id="login-password" required class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-indigo-500">
+        </div>
+        <div class="flex justify-end gap-2">
+          <button type="button" onclick="closeModal('login-modal')" class="px-4 py-2 text-sm text-gray-400 hover:text-white">취소</button>
+          <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium">로그인</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="upload-modal" class="fixed inset-0 bg-black/70 hidden flex items-center justify-center p-4">
+    <div class="bg-gray-800 rounded-xl max-w-lg w-full p-6 border border-gray-700">
+      <h2 class="text-xl font-bold mb-4 text-white">새 도면/모델 추가</h2>
+      <form onsubmit="handleUpload(event)">
+        <div class="mb-3">
+          <label class="block text-sm font-medium text-gray-400 mb-1">작품명</label>
+          <input type="text" id="upload-title" required class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-white text-sm">
+        </div>
+        <div class="mb-3">
+          <label class="block text-sm font-medium text-gray-400 mb-1">사용 툴 (예: AutoCAD, Inventor)</label>
+          <input type="text" id="upload-tool" required class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-white text-sm">
+        </div>
+        <div class="mb-3">
+          <label class="block text-sm font-medium text-gray-400 mb-1">설명</label>
+          <textarea id="upload-desc" rows="2" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-white text-sm"></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="block text-sm font-medium text-gray-400 mb-1">웹 뷰어용 3D 파일 (.stl)</label>
+          <input type="file" id="upload-stl" accept=".stl" class="w-full text-sm text-gray-400">
+        </div>
+        <div class="mb-6">
+          <label class="block text-sm font-medium text-gray-400 mb-1">보관용 원본 CAD 파일 (.dwg, .step 등)</label>
+          <input type="file" id="upload-cad" class="w-full text-sm text-gray-400">
+        </div>
+        <div class="flex justify-end gap-2">
+          <button type="button" onclick="closeModal('upload-modal')" class="px-4 py-2 text-sm text-gray-400 hover:text-white">취소</button>
+          <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium">업로드</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. Supabase 연동 설정 ---
+    // Supabase 대시보드에서 발급받은 Project URL과 Anon Key를 아래에 입력하세요.
+    const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+    const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let isAdmin = false;
+
+    // --- 2. Three.js 3D 뷰어 엔진 ---
+    function init3DViewer(containerId, stlUrl = null) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x030712);
+
+      const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+      camera.position.set(50, 50, 50);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      container.appendChild(renderer.domElement);
+
+      const controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+
+      // 조명 설정
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+      scene.add(ambientLight);
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      dirLight.position.set(1, 1, 1).normalize();
+      scene.add(dirLight);
+
+      // STL 파일 로드 (없을 경우 기본 Cuboid 표시)
+      if (stlUrl) {
+        const loader = new THREE.STLLoader();
+        loader.load(stlUrl, (geometry) => {
+          const material = new THREE.MeshPhongMaterial({ color: 0x6366f1, specular: 0x111111, shininess: 200 });
+          const mesh = new THREE.Mesh(geometry, material);
+          geometry.center();
+          scene.add(mesh);
+        });
+      } else {
+        // 데모용 Cube
+        const geometry = new THREE.BoxGeometry(20, 20, 20);
+        const material = new THREE.MeshPhongMaterial({ color: 0x6366f1 });
+        const mesh = new THREE.Mesh(geometry, material);
+        scene.add(mesh);
+      }
+
+      function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+      }
+      animate();
+    }
+
+    // --- 3. 권한 및 모달 제어 ---
+    function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('login-email').value;
+      const password = document.getElementById('login-password').value;
+
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        alert('로그인 실패: ' + error.message);
+      } else {
+        isAdmin = true;
+        updateUI();
+        closeModal('login-modal');
+      }
+    }
+
+    async function logout() {
+      await supabase.auth.signOut();
+      isAdmin = false;
+      updateUI();
+    }
+
+    function updateUI() {
+      if (isAdmin) {
+        document.getElementById('login-btn').classList.add('hidden');
+        document.getElementById('admin-controls').classList.remove('hidden');
+        document.querySelectorAll('.download-btn').forEach(btn => btn.classList.remove('hidden'));
+      } else {
+        document.getElementById('login-btn').classList.remove('hidden');
+        document.getElementById('admin-controls').classList.add('hidden');
+        document.querySelectorAll('.download-btn').forEach(btn => btn.classList.add('hidden'));
+      }
+    }
+
+    async function handleUpload(e) {
+      e.preventDefault();
+      if (!isAdmin) return alert('관리자만 업로드할 수 있습니다.');
+      alert('업로드 기능이 트리거되었습니다. (Supabase Storage 정책 연동 필요)');
+      closeModal('upload-modal');
+    }
+
+    // 초기화 실행
+    window.addEventListener('DOMContentLoaded', () => {
+      init3DViewer('viewer-demo');
+    });
+  </script>
+</body>
+</html>
